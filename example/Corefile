@@ -1,0 +1,16 @@
+.:53 {
+	bind 172.18.0.1
+	prometheus 172.17.0.1:9053
+	errors
+	cancel 1000ms
+	cache {
+		prefetch 4096 30m 30% 
+		success 8192
+	}
+	v2router geosite.dat {
+		reject geosite:category-ads-all
+		forward geosite:geolocation-!cn to tcp://1.1.1.1:53;tcp://8.8.8.8:53 retry:10 timeout:800ms
+		forward geosite:cn to udp://114.114.114.114:53;udp://119.29.29.29:53
+		default tcp://1.1.1.1:53;tcp://8.8.8.8:53 timeout:800ms retry:10
+	}
+}
