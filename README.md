@@ -1,5 +1,7 @@
 # dnsserver
 
+[![Docker Pulls](https://img.shields.io/docker/pulls/iosmanthus/dnsserver.svg)](https://hub.docker.com/r/iosmanthus/dnsserver)
+
 dnsserver is DNS proxy based on [CoreDNS](https://github.com/coredns/coredns). It forward the DNS request to different upstream by the rules. The rules are powered by the geosite data from V2Ray.
 
 ## Usage
