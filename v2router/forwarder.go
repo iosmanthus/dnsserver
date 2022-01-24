@@ -3,12 +3,13 @@ package v2router
 import (
 	"context"
 	"fmt"
-	"github.com/iosmanthus/dnsserver/request"
 	"net"
 	"time"
 
-	"github.com/cenkalti/backoff"
+	"github.com/iosmanthus/dnsserver/request"
 	"github.com/iosmanthus/dnsserver/transport"
+
+	"github.com/cenkalti/backoff"
 	"github.com/miekg/dns"
 )
 

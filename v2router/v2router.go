@@ -3,15 +3,15 @@ package v2router
 import (
 	"context"
 	"fmt"
-	"github.com/iosmanthus/dnsserver/request"
 	"time"
 
+	"github.com/iosmanthus/dnsserver/request"
+
+	"github.com/coredns/coredns/plugin"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/iosmanthus/geomatch"
 	"github.com/miekg/dns"
 	"github.com/sirupsen/logrus"
-
-	"github.com/coredns/coredns/plugin"
 )
 
 const self = "v2router"
