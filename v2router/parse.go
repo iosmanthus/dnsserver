@@ -15,28 +15,25 @@ import (
 )
 
 const (
-	defaultRetry       = 8
-	defaultTimeout     = time.Millisecond * 500
-	defaultConnections = 4
-	defaultMatchCache  = 4096
+	defaultRetry      = 8
+	defaultTimeout    = time.Millisecond * 500
+	defaultMatchCache = 4096
 )
 
 type Parser struct {
-	controller       *caddy.Controller
 	geosite          string
 	forwarders       []Forwarder
 	matchers         []geomatch.Matcher
 	defaultForwarder Forwarder
 }
 
-func NewParser(c *caddy.Controller) *Parser {
-	return &Parser{controller: c}
+func NewParser() *Parser {
+	return &Parser{}
 }
 
-func (p *Parser) Parse() (*V2Router, error) {
+func (p *Parser) Parse(c *caddy.Controller) (*V2Router, error) {
 	var (
 		err error
-		c   = p.controller
 		i   = 0
 	)
 
@@ -46,12 +43,12 @@ func (p *Parser) Parse() (*V2Router, error) {
 		}
 		i++
 
-		err = p.parseArgs()
+		err = p.parseArgs(c)
 		if err != nil {
 			return nil, c.Errf("%v", err)
 		}
 
-		err = p.parseBlock()
+		err = p.parseBlock(c)
 		if err != nil {
 			return nil, c.Errf("%v", err)
 		}
@@ -70,8 +67,7 @@ func (p *Parser) Parse() (*V2Router, error) {
 	}, nil
 }
 
-func (p *Parser) parseArgs() error {
-	c := p.controller
+func (p *Parser) parseArgs(c *caddy.Controller) error {
 	if !c.Next() {
 		return c.ArgErr()
 	}
@@ -80,10 +76,9 @@ func (p *Parser) parseArgs() error {
 	return nil
 }
 
-func (p *Parser) parseBlock() error {
+func (p *Parser) parseBlock(c *caddy.Controller) error {
 	var (
 		err              error
-		c                = p.controller
 		hasDefault       bool
 		forwarders       []Forwarder
 		matchers         []geomatch.Matcher
@@ -93,14 +88,14 @@ func (p *Parser) parseBlock() error {
 	for c.NextBlock() {
 		switch c.Val() {
 		case "forward":
-			forward, matcher, err := p.parseForward()
+			forward, matcher, err := p.parseForward(c)
 			if err != nil {
 				return err
 			}
 			forwarders = append(forwarders, forward)
 			matchers = append(matchers, matcher)
 		case "reject":
-			reject, matcher, err := p.parseReject()
+			reject, matcher, err := p.parseReject(c)
 			if err != nil {
 				return c.Errf("%v", err)
 			}
@@ -111,7 +106,7 @@ func (p *Parser) parseBlock() error {
 				return errors.New("multiple default routes detected")
 			}
 			hasDefault = true
-			defaultForwarder, err = p.parseDefault()
+			defaultForwarder, err = p.parseDefault(c)
 			if err != nil {
 				return err
 			}
@@ -167,16 +162,14 @@ func parseUpstream(addr string) ([]net.Addr, error) {
 }
 
 type attributes struct {
-	connections uint64
-	retry       int
-	timeout     time.Duration
+	retry   int
+	timeout time.Duration
 }
 
 func parseAttribute(args []string) (*attributes, error) {
 	attr := &attributes{
-		connections: defaultConnections,
-		retry:       defaultRetry,
-		timeout:     defaultTimeout,
+		retry:   defaultRetry,
+		timeout: defaultTimeout,
 	}
 	for _, arg := range args {
 		kv := strings.SplitN(arg, ":", 2)
@@ -191,12 +184,6 @@ func parseAttribute(args []string) (*attributes, error) {
 				return nil, err
 			}
 			attr.timeout = timeout
-		case "connections":
-			connections, err := strconv.ParseUint(v, 10, 64)
-			if err != nil {
-				return nil, err
-			}
-			attr.connections = connections
 		case "retry":
 			retry, err := strconv.Atoi(v)
 			if err != nil {
@@ -210,8 +197,7 @@ func parseAttribute(args []string) (*attributes, error) {
 	return attr, nil
 }
 
-func (p *Parser) parseForward() (Forwarder, geomatch.Matcher, error) {
-	c := p.controller
+func (p *Parser) parseForward(c *caddy.Controller) (Forwarder, geomatch.Matcher, error) {
 	args := c.RemainingArgs()
 	l := len(args)
 	if l < 3 {
@@ -258,8 +244,7 @@ func (p *Parser) parseForward() (Forwarder, geomatch.Matcher, error) {
 	return forward, matcher, nil
 }
 
-func (p *Parser) parseDefault() (Forwarder, error) {
-	c := p.controller
+func (p *Parser) parseDefault(c *caddy.Controller) (Forwarder, error) {
 	args := c.RemainingArgs()
 	if len(args) == 0 {
 		return nil, errors.New("missing default router")
@@ -275,8 +260,7 @@ func (p *Parser) parseDefault() (Forwarder, error) {
 	return NewPlainForwarder(addrs, attr)
 }
 
-func (p *Parser) parseReject() (Forwarder, geomatch.Matcher, error) {
-	c := p.controller
+func (p *Parser) parseReject(c *caddy.Controller) (Forwarder, geomatch.Matcher, error) {
 	args := c.RemainingArgs()
 
 	if len(args) == 0 {

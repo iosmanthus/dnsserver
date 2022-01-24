@@ -3,18 +3,27 @@ package v2router
 import (
 	"context"
 	"fmt"
+	"github.com/iosmanthus/dnsserver/request"
 	"time"
 
-	"github.com/coredns/coredns/plugin"
-	clog "github.com/coredns/coredns/plugin/pkg/log"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/iosmanthus/geomatch"
 	"github.com/miekg/dns"
+	"github.com/sirupsen/logrus"
+
+	"github.com/coredns/coredns/plugin"
 )
 
 const self = "v2router"
 
-var log = clog.NewWithPlugin(self)
+var log = logrus.WithFields(logrus.Fields{
+	"plugin": self,
+})
+
+type Forwarder interface {
+	fmt.Stringer
+	Forward(ctx context.Context, w dns.ResponseWriter, m *dns.Msg) (int, error)
+}
 
 type V2Router struct {
 	forwarders       []Forwarder
@@ -24,20 +33,27 @@ type V2Router struct {
 	Next             plugin.Handler
 }
 
-func logRtt(begin time.Time, key string) {
+func logHelper(log *logrus.Entry, key string, begin time.Time) {
 	used := time.Since(begin)
-	format := "%s resolved, used %v"
-	var logger func(format string, v ...interface{})
+	format := "resolved %s"
+
+	log = log.WithFields(logrus.Fields{
+		"duration": used,
+	})
+
+	var logFunc func(format string, args ...interface{})
 	if used >= time.Second {
-		logger = log.Warningf
+		logFunc = log.Warningf
 	} else {
-		logger = log.Infof
+		logFunc = log.Infof
 	}
-	logger(format, key, used)
+	logFunc(format, key)
 }
 
 func (v *V2Router) ServeDNS(ctx context.Context, w dns.ResponseWriter, m *dns.Msg) (int, error) {
 	begin := time.Now()
+	ctx = request.WithContext(ctx)
+	log := request.WithLogger(ctx, log)
 
 	questions := m.Question
 	matchers := v.matchers
@@ -48,7 +64,7 @@ func (v *V2Router) ServeDNS(ctx context.Context, w dns.ResponseWriter, m *dns.Ms
 
 	key := questions[0].Name
 
-	defer logRtt(begin, key)
+	defer logHelper(log, key, begin)
 
 	if i, ok := v.cache.Get(key); ok {
 		idx := i.(int)

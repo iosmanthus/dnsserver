@@ -3,6 +3,7 @@ module github.com/iosmanthus/dnsserver
 go 1.17
 
 require (
+	github.com/caarlos0/env/v6 v6.9.1
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/coredns/caddy v1.1.1
 	github.com/coredns/coredns v1.8.6
@@ -10,6 +11,8 @@ require (
 	github.com/iosmanthus/geomatch v0.0.0-20210225085458-647a48e0b6d0
 	github.com/miekg/dns v1.1.45
 	github.com/prometheus/client_golang v1.11.0
+	github.com/sirupsen/logrus v1.7.0
+	go.uber.org/atomic v1.9.0
 )
 
 require (

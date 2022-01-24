@@ -3,18 +3,20 @@ package v2router
 import (
 	"context"
 	"fmt"
-	"github.com/cenkalti/backoff"
-	"github.com/iosmanthus/dnsserver/transport"
+	"github.com/iosmanthus/dnsserver/request"
 	"net"
 	"time"
 
+	"github.com/cenkalti/backoff"
+	"github.com/iosmanthus/dnsserver/transport"
 	"github.com/miekg/dns"
 )
 
-type Forwarder interface {
-	fmt.Stringer
-	Forward(ctx context.Context, w dns.ResponseWriter, m *dns.Msg) (int, error)
-}
+const (
+	defaultYieldTimeout = time.Millisecond * 500
+	defaultGCPeriod     = time.Second * 10
+	defaultExpire       = time.Second * 10
+)
 
 type UpstreamsForwarder struct {
 	transports []*transport.Transport
@@ -45,10 +47,9 @@ func NewPlainForwarder(addrs []net.Addr, attr *attributes) (*UpstreamsForwarder,
 	for i := range transports {
 		addr := addrs[i]
 		transports[i] = transport.NewTransport(transport.Options{
-			Capacity:     int(attr.connections),
-			Expire:       defaultTimeout,
-			GC:           defaultTimeout,
-			YieldTimeout: defaultTimeout,
+			Expire:       defaultExpire,
+			GC:           defaultGCPeriod,
+			YieldTimeout: defaultYieldTimeout,
 			Network:      addr.Network(),
 			Address:      addr.String(),
 		})
@@ -78,9 +79,9 @@ func (f *UpstreamsForwarder) String() string {
 }
 
 type result struct {
-	err      error
-	ok       *dns.Msg
-	upstream net.Addr
+	err   error
+	ok    *dns.Msg
+	index int
 }
 
 func getQuestionName(m *dns.Msg) string {
@@ -91,7 +92,9 @@ func getQuestionName(m *dns.Msg) string {
 	return name
 }
 
-func (f *UpstreamsForwarder) doExchange(index int, m *dns.Msg) (*dns.Msg, error) {
+func (f *UpstreamsForwarder) doExchange(ctx context.Context, index int, m *dns.Msg) (*dns.Msg, error) {
+	log := request.WithLogger(ctx, log)
+
 	pc, cached, err := f.transports[index].Dial(f.timeout)
 	if err != nil {
 		return nil, err
@@ -101,8 +104,14 @@ func (f *UpstreamsForwarder) doExchange(index int, m *dns.Msg) (*dns.Msg, error)
 		go pc.Close()
 		return nil, err
 	}
+
+	key := getQuestionName(m)
 	if cached {
-		log.Infof("using cached connection for %s to %v", getQuestionName(m), f.addrs[index])
+		connectionCacheHitCounterVec.WithLabelValues(f.addrs[index].String()).Inc()
+		log.Infof("using cached connection for %s to %v", key, f.addrs[index])
+	} else {
+		connectionCacheMissCounterVec.WithLabelValues(f.addrs[index].String()).Inc()
+		log.Infof("using new connection for %s to %v", key, f.addrs[index])
 	}
 	f.transports[index].Yield(pc)
 	return r, nil
@@ -112,70 +121,69 @@ func (f *UpstreamsForwarder) exchange(ctx context.Context, index int, m *dns.Msg
 	backoffer := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), uint64(f.retry))
 	boCtx := backoff.WithContext(backoffer, ctx)
 	err := backoff.Retry(func() error {
-		resp, err := f.doExchange(index, m)
+		resp, err := f.doExchange(ctx, index, m)
 		if err != nil {
 			return err
 		}
 		ch <- result{
-			ok:       resp,
-			upstream: f.addrs[index],
+			ok:    resp,
+			index: index,
 		}
 		return nil
 	}, boCtx)
 	if err != nil {
 		ch <- result{
-			err:      err,
-			upstream: f.addrs[index],
+			err:   err,
+			index: index,
 		}
 	}
 }
 
 func (f *UpstreamsForwarder) Forward(ctx context.Context, w dns.ResponseWriter, m *dns.Msg) (int, error) {
-	responses := make(chan result, len(f.addrs))
+	log := request.WithLogger(ctx, log)
 
+	responses := make(chan result, len(f.addrs))
+	cancels := make([]context.CancelFunc, len(f.addrs))
 	for i := range f.addrs {
+		ctx, cancel := context.WithCancel(ctx)
+		cancels[i] = cancel
 		go f.exchange(ctx, i, m, responses)
 	}
 	select {
 	case <-ctx.Done():
 		return dns.RcodeServerFailure, ctx.Err()
 	case resp := <-responses:
+		for i, cancel := range cancels {
+			if i != resp.index {
+				cancel()
+			}
+		}
+		go f.ignoreResponses(ctx, responses, m)
+
 		if err := resp.err; err != nil {
 			return dns.RcodeServerFailure, err
 		}
 
-		log.Infof("accepts response from %s for %s", resp.upstream, getQuestionName(m))
+		log.Infof("accepts response from %s for %s", f.addrs[resp.index], getQuestionName(m))
 		upstreamGaugeVec.With(map[string]string{
-			"upstream": resp.upstream.String(),
+			"upstream": f.addrs[resp.index].String(),
 		}).Inc()
 
-		w.WriteMsg(resp.ok)
+		_ = w.WriteMsg(resp.ok)
 		return resp.ok.Rcode, nil
 	}
 }
 
-type Reject struct{}
+func (f *UpstreamsForwarder) ignoreResponses(ctx context.Context, responses <-chan result, m *dns.Msg) {
+	log := request.WithLogger(ctx, log)
 
-func NewReject() Forwarder {
-	return &Reject{}
-}
-
-func (f *Reject) String() string {
-	return "reject"
-}
-func (f *Reject) Forward(_ context.Context, w dns.ResponseWriter, m *dns.Msg) (int, error) {
-	name := getQuestionName(m)
-
-	log.Infof("reject: %s", name)
-	rejectGaugeVec.With(map[string]string{
-		"name": name,
-	}).Inc()
-
-	empty := &dns.Msg{}
-	empty.SetReply(m)
-	empty.Answer = []dns.RR{
-		&dns.A{A: net.ParseIP("0.0.0.0")},
+	for i := 0; i < len(f.addrs)-1; i++ {
+		resp := <-responses
+		key := getQuestionName(m)
+		if err := resp.err; err != nil {
+			log.Infof("ignore error: %v from %s for %s", err, f.addrs[resp.index], key)
+		} else {
+			log.Infof("ignore a slower result from %s for %s", f.addrs[resp.index], key)
+		}
 	}
-	w.WriteMsg(empty)
-	return dns.RcodeSuccess, nil
 }

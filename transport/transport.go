@@ -1,15 +1,19 @@
 package transport
 
 import (
-	"github.com/miekg/dns"
-	"github.com/prometheus/client_golang/prometheus"
-
 	"sort"
 	"time"
+
+	"github.com/miekg/dns"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 )
 
+var log = logrus.WithFields(logrus.Fields{
+	"plugin": "transport",
+})
+
 type Options struct {
-	Capacity     int
 	Expire       time.Duration
 	GC           time.Duration
 	YieldTimeout time.Duration
@@ -39,7 +43,6 @@ type PersistentConn struct {
 func NewTransport(options Options) *Transport {
 	t := &Transport{
 		options: &options,
-		conns:   make([]*PersistentConn, 0, options.Capacity),
 		dial:    make(chan struct{}),
 		ret:     make(chan *PersistentConn),
 		yield:   make(chan *PersistentConn),
@@ -82,6 +85,13 @@ Wait:
 }
 
 func (t *Transport) cleanup(all bool) {
+	start := time.Now()
+	defer func() {
+		log.WithFields(logrus.Fields{
+			"duration": time.Since(start),
+		}).Debugf("cleaned connection pool for %s", t.options.Address)
+	}()
+
 	staleTime := time.Now().Add(-t.options.Expire)
 	conns := t.conns
 	if len(conns) == 0 {

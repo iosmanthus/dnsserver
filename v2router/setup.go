@@ -11,8 +11,8 @@ func init() {
 }
 
 func setup(c *caddy.Controller) error {
-	p := NewParser(c)
-	v, err := p.Parse()
+	p := NewParser()
+	v, err := p.Parse(c)
 	if err != nil {
 		return plugin.Error(self, err)
 	}

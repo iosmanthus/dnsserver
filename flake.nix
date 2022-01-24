@@ -15,7 +15,7 @@
             {
               devShell = pkgs.mkShell {
                 hardeningDisable = [ "all" ];
-                buildInputs = with pkgs;[ git go_1_17 gcc gnumake ];
+                buildInputs = with pkgs;[ git go_1_17 gcc gnumake golangci-lint ];
               };
             }
       );
