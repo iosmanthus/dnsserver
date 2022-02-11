@@ -1,4 +1,4 @@
 /.idea
-/example/*.dat
+**/*.dat
 /.direnv
 **/dnsserver

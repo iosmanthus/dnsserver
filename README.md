@@ -12,7 +12,6 @@ The format of dnsserver config file is the based on `Corefile`, but with `v2rout
 - [x] `prometheus`
 - [x] `errors`
 - [x] `cache`
-- [x] `v2router`
 
 Here is an example config for `v2router` plugin:
 ```Corefile
@@ -22,11 +21,10 @@ Here is an example config for `v2router` plugin:
 		reject geosite:category-ads-all
 
         # forward some category of domains to a list of upstream
-        # 4 attributes available
-	    # `connections`
+        # 2 attributes available
 	    # `retry`
 	    # `timeout`
-        # Only DNS over TCP/UDP are supported now.
+        # Only DNS over TCP/UDP is supported now.
 		forward geosite:geolocation-!cn to tcp://1.1.1.1:53;tcp://8.8.8.8:53 retry:10 timeout:800ms
 		forward geosite:cn to udp://114.114.114.114:53;udp://119.29.29.29:53
 

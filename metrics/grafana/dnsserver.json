@@ -1,9 +1,19 @@
 {
+  "__inputs": [
+    {
+      "name": "datasource",
+      "label": "dnsserver",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
   "annotations": {
     "list": [
       {
         "builtIn": 1,
-        "datasource": "-- Grafana --",
+        "datasource": "${datasource}",
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -21,7 +31,8 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 1,
+  "id": 2,
+  "iteration": 1644597211911,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -33,7 +44,7 @@
           },
           "custom": {
             "axisLabel": "",
-            "axisPlacement": "auto",
+            "axisPlacement": "left",
             "barAlignment": 0,
             "drawStyle": "line",
             "fillOpacity": 8,
@@ -43,7 +54,10 @@
               "tooltip": false,
               "viz": false
             },
-            "lineInterpolation": "smooth",
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
             "lineWidth": 2,
             "pointSize": 5,
             "scaleDistribution": {
@@ -88,7 +102,7 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "right"
         },
         "tooltip": {
           "mode": "multi"
@@ -96,12 +110,9 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "bLKZjqAnz"
-          },
+          "datasource": "${datasource}",
           "exemplar": true,
-          "expr": "coredns_dns_request_duration_seconds_sum / coredns_dns_request_duration_seconds_count",
+          "expr": "rate(coredns_dns_request_duration_seconds_sum{instance=~\"$instance\"}[$__rate_interval]) / rate(coredns_dns_request_duration_seconds_count{instance=~\"$instance\"}[$__rate_interval])",
           "interval": "",
           "legendFormat": "{{ server }}",
           "refId": "A"
@@ -128,7 +139,7 @@
               "tooltip": false,
               "viz": false
             },
-            "lineInterpolation": "smooth",
+            "lineInterpolation": "linear",
             "lineWidth": 2,
             "pointSize": 5,
             "scaleDistribution": {
@@ -181,14 +192,11 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "bLKZjqAnz"
-          },
+          "datasource": "${datasource}",
           "exemplar": true,
-          "expr": "histogram_quantile(0.99, sum(rate(coredns_dns_request_duration_seconds_bucket[5m])) by (le, type, server))",
+          "expr": "histogram_quantile(0.99, sum(rate(coredns_dns_request_duration_seconds_bucket{instance=~\"$instance\"}[$__rate_interval])) by (le, server))",
           "interval": "",
-          "legendFormat": "{{server }} - {{ type }}",
+          "legendFormat": "{{server }}",
           "refId": "A"
         }
       ],
@@ -213,7 +221,7 @@
               "tooltip": false,
               "viz": false
             },
-            "lineInterpolation": "smooth",
+            "lineInterpolation": "linear",
             "lineWidth": 2,
             "pointSize": 5,
             "scaleDistribution": {
@@ -258,7 +266,7 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "right"
         },
         "tooltip": {
           "mode": "single"
@@ -266,12 +274,9 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "bLKZjqAnz"
-          },
+          "datasource": "${datasource}",
           "exemplar": true,
-          "expr": "sum(coredns_cache_hits_total) by (server) / sum(coredns_cache_requests_total) by (server)",
+          "expr": "sum(rate(coredns_cache_hits_total{instance=~\"$instance\"}[$__rate_interval])) by (server) / sum(rate(coredns_cache_requests_total{instance=~\"$instance\"}[$__rate_interval])) by (server)",
           "interval": "",
           "legendFormat": "{{ server }}",
           "refId": "A"
@@ -333,10 +338,7 @@
       "pluginVersion": "8.3.3",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "bLKZjqAnz"
-          },
+          "datasource": "${datasource}",
           "exemplar": false,
           "expr": "topk(10, dnsserver_v2router_reject)",
           "format": "table",
@@ -354,6 +356,7 @@
             "excludeByName": {
               "Time": true,
               "__name__": true,
+              "instance": true,
               "job": true
             },
             "indexByName": {
@@ -393,7 +396,7 @@
               "tooltip": false,
               "viz": false
             },
-            "lineInterpolation": "smooth",
+            "lineInterpolation": "linear",
             "lineWidth": 2,
             "pointSize": 5,
             "scaleDistribution": {
@@ -437,7 +440,7 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "right"
         },
         "tooltip": {
           "mode": "single"
@@ -445,18 +448,15 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "bLKZjqAnz"
-          },
+          "datasource": "${datasource}",
           "exemplar": true,
-          "expr": "coredns_cache_entries",
+          "expr": "coredns_cache_entries{instance=~\"$instance\"}",
           "interval": "",
           "legendFormat": "{{ type }}",
           "refId": "A"
         }
       ],
-      "title": "Cache",
+      "title": "Cache Entries",
       "type": "timeseries"
     },
     {
@@ -477,7 +477,7 @@
               "tooltip": false,
               "viz": false
             },
-            "lineInterpolation": "smooth",
+            "lineInterpolation": "linear",
             "lineWidth": 2,
             "pointSize": 5,
             "scaleDistribution": {
@@ -506,7 +506,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "percentunit"
         },
         "overrides": []
       },
@@ -529,18 +530,15 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "bLKZjqAnz"
-          },
+          "datasource": "${datasource}",
           "exemplar": true,
-          "expr": "sum(dnsserver_v2router_upstream) by (server, upstream)",
+          "expr": "sum(rate(dnsserver_v2router_upstream{instance=~\"$instance\"}[$__rate_interval])) by (upstream) / scalar(sum(rate(dnsserver_v2router_upstream{instance=~\"$instance\"}[$__rate_interval])))",
           "interval": "",
           "legendFormat": "{{ upstream }}",
           "refId": "A"
         }
       ],
-      "title": "Upstream",
+      "title": "Upstream Distribution",
       "type": "timeseries"
     },
     {
@@ -614,14 +612,11 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "bLKZjqAnz"
-          },
+          "datasource": "${datasource}",
           "exemplar": true,
-          "expr": "histogram_quantile(0.99, sum(rate(dnsserver_v2router_dial_bucket[5m])) by (le, address))",
+          "expr": "histogram_quantile(0.99, sum(rate(dnsserver_v2router_dial_bucket{instance=~\"$instance\"}[$__rate_interval])) by (le, address))",
           "interval": "",
-          "legendFormat": "{{ address }}",
+          "legendFormat": "{{ address }} ",
           "refId": "A"
         }
       ],
@@ -646,7 +641,7 @@
               "tooltip": false,
               "viz": false
             },
-            "lineInterpolation": "smooth",
+            "lineInterpolation": "linear",
             "lineWidth": 2,
             "pointSize": 5,
             "scaleDistribution": {
@@ -691,7 +686,7 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "right"
         },
         "tooltip": {
           "mode": "single"
@@ -699,12 +694,9 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "bLKZjqAnz"
-          },
+          "datasource": "${datasource}",
           "exemplar": true,
-          "expr": "(time() - process_start_time_seconds{job=\"dnsserver\"})",
+          "expr": "(time() - process_start_time_seconds{instance=~\"$instance\", job=\"dnsserver\"})",
           "interval": "",
           "legendFormat": "{{ instance }}",
           "refId": "A"
@@ -712,23 +704,134 @@
       ],
       "title": "Uptime",
       "type": "timeseries"
+    },
+    {
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 8,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 31
+      },
+      "id": 20,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "right"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "datasource": "${datasource}",
+          "exemplar": true,
+          "expr": "sum(rate(dnsserver_v2router_connection_cache_hit{instance=~\"$instance\"}[$__rate_interval])) by (upstream) / scalar(sum(rate(dnsserver_v2router_dial_count{instance=~\"$instance\"}[$__rate_interval])))",
+          "interval": "",
+          "legendFormat": "{{ upstream }}",
+          "refId": "A"
+        }
+      ],
+      "title": "Connection Cache Hit",
+      "type": "timeseries"
     }
   ],
-  "refresh": "5s",
+  "refresh": "",
   "schemaVersion": 34,
   "style": "dark",
   "tags": [],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": [
+            "172.17.0.1:9053"
+          ],
+          "value": [
+            "172.17.0.1:9053"
+          ]
+        },
+        "definition": "label_values(dnsserver_v2router_upstream, instance)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "instance",
+        "multi": true,
+        "name": "instance",
+        "options": [],
+        "query": {
+          "query": "label_values(dnsserver_v2router_upstream, instance)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "dnsserver",
   "uid": "P2cOC307z",
-  "version": 44,
+  "version": 30,
   "weekStart": ""
 }
